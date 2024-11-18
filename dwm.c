@@ -71,7 +71,7 @@
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
-enum { SchemeNorm, SchemeSel }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeN /* keeplast */ }; /* color schemes */
 enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
        NetSystemTray, NetSystemTrayOP, NetSystemTrayOrientation, NetSystemTrayOrientationHorz,
        NetWMFullscreen, NetActiveWindow, NetWMWindowType,
@@ -231,6 +231,7 @@ static void setfullscreen(Client *c, int fullscreen);
 static void setlayout(const Arg *arg);
 static void setcfact(const Arg *arg);
 static void setmfact(const Arg *arg);
+static void setscheme(const Arg *arg);
 static void setup(void);
 static void seturgent(Client *c, int urg);
 static void showhide(Client *c);
@@ -305,7 +306,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 static Atom wmatom[WMLast], netatom[NetLast], xatom[XLast];
 static int running = 1;
 static Cur *cursor[CurLast];
-static Clr **scheme;
+static Clr **schemes, **scheme;
 static Display *dpy;
 static Drw *drw;
 static Monitor *mons, *selmon;
@@ -606,9 +607,9 @@ cleanup(void)
 
 	for (i = 0; i < CurLast; i++)
 		drw_cur_free(drw, cursor[i]);
-	for (i = 0; i < LENGTH(colors); i++)
-		free(scheme[i]);
-	free(scheme);
+	for (i = 0; i < LENGTH(colors) * SchemeN; i++)
+		free(schemes[i]);
+	free(schemes);
 	XDestroyWindow(dpy, wmcheckwin);
 	drw_free(drw);
 	XSync(dpy, False);
@@ -1850,9 +1851,26 @@ setmfact(const Arg *arg)
 }
 
 void
+setscheme(const Arg *arg)
+{
+	ptrdiff_t si = (scheme - schemes) + arg->i * SchemeN;
+
+	/* wrap around, won't work if (abs(arg->i) > LENGTH(colors)) */
+	if (si < 0)
+		si += LENGTH(colors) * SchemeN;
+	else if (si >= LENGTH(colors) * SchemeN)
+		si -= LENGTH(colors) * SchemeN;
+
+	scheme = &schemes[si];
+	/* init system tray */
+	updatesystray();
+	drawbars();
+}
+
+void
 setup(void)
 {
-	int i;
+	int i, j;
 	XSetWindowAttributes wa;
 	Atom utf8string;
 	struct sigaction sa;
@@ -1904,9 +1922,12 @@ setup(void)
 	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
 	cursor[CurMove] = drw_cur_create(drw, XC_fleur);
 	/* init appearance */
-	scheme = ecalloc(LENGTH(colors), sizeof(Clr *));
-	for (i = 0; i < LENGTH(colors); i++)
-		scheme[i] = drw_scm_create(drw, colors[i], 3);
+	schemes = ecalloc(LENGTH(colors), SchemeN * sizeof(Clr *));
+	for (j = LENGTH(colors) - 1; j >= 0; j--) {
+		scheme = &schemes[j * SchemeN];
+		for (i = 0; i < SchemeN; i++)
+			scheme[i] = drw_scm_create(drw, colors[j][i], 3);
+	}
 	/* init system tray */
 	updatesystray();
 	/* init bars */
