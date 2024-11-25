@@ -185,6 +185,7 @@ static void destroynotify(XEvent *e);
 static void detach(Client *c);
 static void detachstack(Client *c);
 static Monitor *dirtomon(int dir);
+static void dmenu(const Arg *arg);
 static void drawbar(Monitor *m);
 static void drawbars(void);
 static void enternotify(XEvent *e);
@@ -225,11 +226,12 @@ static void run(void);
 static void scan(void);
 static int sendevent(Window w, Atom proto, int m, long d0, long d1, long d2, long d3, long d4);
 static void sendmon(Client *c, Monitor *m);
+static void setbg(void);
+static void setcfact(const Arg *arg);
 static void setclientstate(Client *c, long state);
 static void setfocus(Client *c);
 static void setfullscreen(Client *c, int fullscreen);
 static void setlayout(const Arg *arg);
-static void setcfact(const Arg *arg);
 static void setmfact(const Arg *arg);
 static void setscheme(const Arg *arg);
 static void setup(void);
@@ -269,11 +271,6 @@ static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
 static void zoom(const Arg *arg);
 
-static void keyrelease(XEvent *e);
-static void combotag(const Arg *arg);
-static void comboview(const Arg *arg);
-
-
 /* variables */
 static Systray *systray = NULL;
 static const char broken[] = "broken";
@@ -286,7 +283,6 @@ static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static void (*handler[LASTEvent]) (XEvent *) = {
 	[ButtonPress] = buttonpress,
-	[ButtonRelease] = keyrelease,
 	[ClientMessage] = clientmessage,
 	[ConfigureRequest] = configurerequest,
 	[ConfigureNotify] = configurenotify,
@@ -294,7 +290,6 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 	[EnterNotify] = enternotify,
 	[Expose] = expose,
 	[FocusIn] = focusin,
-	[KeyRelease] = keyrelease,
 	[KeyPress] = keypress,
 	[MappingNotify] = mappingnotify,
 	[MapRequest] = maprequest,
@@ -328,68 +323,6 @@ struct Pertag {
 struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 /* function implementations */
-static int combo = 0;
-
-void
-keyrelease(XEvent *e) {
-	combo = 0;
-}
-
-void
-combotag(const Arg *arg) {
-	if(selmon->sel && arg->ui & TAGMASK) {
-		if (combo) {
-			selmon->sel->tags |= arg->ui & TAGMASK;
-		} else {
-			combo = 1;
-			selmon->sel->tags = arg->ui & TAGMASK;
-		}
-		focus(NULL);
-		arrange(selmon);
-	}
-}
-
-void
-comboview(const Arg *arg) {
-  int i;
-  unsigned int tmptag, newtags;
-
-  newtags = arg->ui & TAGMASK;
-
-	if (combo) {
-		selmon->tagset[selmon->seltags] |= newtags;
-	} else {
-		selmon->seltags ^= 1;	/*toggle tagset*/
-		combo = 1;
-		if (newtags) {
-			selmon->tagset[selmon->seltags] = newtags;
-      selmon->pertag->prevtag = selmon->pertag->curtag;
-
-      if (arg->ui == ~0) {
-        selmon->pertag->curtag = 0;
-      } else {
-        for (i = 0; !(arg->ui & 1 << i); i++) ;
-        selmon->pertag->curtag = i + 1;
-      }
-    } else {
-      tmptag = selmon->pertag->prevtag;
-      selmon->pertag->prevtag = selmon->pertag->curtag;
-      selmon->pertag->curtag = tmptag;
-    }
-	}
-
-  selmon->nmaster = selmon->pertag->nmasters[selmon->pertag->curtag];
-  selmon->mfact = selmon->pertag->mfacts[selmon->pertag->curtag];
-  selmon->sellt = selmon->pertag->sellts[selmon->pertag->curtag];
-  selmon->lt[selmon->sellt] = selmon->pertag->ltidxs[selmon->pertag->curtag][selmon->sellt];
-  selmon->lt[selmon->sellt^1] = selmon->pertag->ltidxs[selmon->pertag->curtag][selmon->sellt^1];
-
-  if (selmon->showbar != selmon->pertag->showbars[selmon->pertag->curtag])
-    togglebar(NULL);
-
-	focus(NULL);
-	arrange(selmon);
-}
 
 void
 applyrules(Client *c)
@@ -607,7 +540,7 @@ cleanup(void)
 
 	for (i = 0; i < CurLast; i++)
 		drw_cur_free(drw, cursor[i]);
-	for (i = 0; i < LENGTH(colors) * SchemeN; i++)
+	for (i = 0; i < LENGTH(themes) * SchemeN; i++)
 		free(schemes[i]);
 	free(schemes);
 	XDestroyWindow(dpy, wmcheckwin);
@@ -954,8 +887,8 @@ drawbar(Monitor *m)
 	x = drw_text(drw, x, 0, w, bh, lrpad / 2, m->ltsymbol, 0);
 
 	if ((w = m->ww - tw - x) > bh) {
-    drw_setscheme(drw, scheme[SchemeNorm]);
-    drw_rect(drw, x, 0, w, bh, 1, 1);
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_rect(drw, x, 0, w, bh, 1, 1);
 	}
 	drw_map(drw, m->barwin, 0, 0, m->ww - stw, bh);
 }
@@ -1851,17 +1784,28 @@ setmfact(const Arg *arg)
 }
 
 void
+setbg(void)
+{
+	XSetWindowBackground(dpy, root, scheme[SchemeNorm][ColBg].pixel);
+	XClearWindow(dpy, root);
+	// XFlush(dpy);
+}
+
+void
 setscheme(const Arg *arg)
 {
 	ptrdiff_t si = (scheme - schemes) + arg->i * SchemeN;
 
-	/* wrap around, won't work if (abs(arg->i) > LENGTH(colors)) */
+	/* wrap around, won't work if (abs(arg->i) > LENGTH(themes)) */
 	if (si < 0)
-		si += LENGTH(colors) * SchemeN;
-	else if (si >= LENGTH(colors) * SchemeN)
-		si -= LENGTH(colors) * SchemeN;
+		si += LENGTH(themes) * SchemeN;
+	else if (si >= LENGTH(themes) * SchemeN)
+		si -= LENGTH(themes) * SchemeN;
 
 	scheme = &schemes[si];
+	theme = (struct theme*)&themes[(scheme - schemes) / 2];
+	setbg();
+  setenv("DWM_THEME", theme->name, 1);
 	/* init system tray */
 	updatesystray();
 	drawbars();
@@ -1870,10 +1814,11 @@ setscheme(const Arg *arg)
 void
 setup(void)
 {
-	int i, j;
+	int i;
 	XSetWindowAttributes wa;
 	Atom utf8string;
 	struct sigaction sa;
+	char *colors[3];
 
 	/* do not transform children into zombies when they terminate */
 	sigemptyset(&sa.sa_mask);
@@ -1922,11 +1867,17 @@ setup(void)
 	cursor[CurResize] = drw_cur_create(drw, XC_sizing);
 	cursor[CurMove] = drw_cur_create(drw, XC_fleur);
 	/* init appearance */
-	schemes = ecalloc(LENGTH(colors), SchemeN * sizeof(Clr *));
-	for (j = LENGTH(colors) - 1; j >= 0; j--) {
-		scheme = &schemes[j * SchemeN];
-		for (i = 0; i < SchemeN; i++)
-			scheme[i] = drw_scm_create(drw, colors[j][i], 3);
+	schemes = ecalloc(LENGTH(themes), SchemeN * sizeof(Clr *));
+	for (i = LENGTH(themes) - 1; i >= 0; i--) {
+		scheme = &schemes[i * SchemeN];
+		colors[0] = (char*)themes[i].fg;
+		colors[1] = (char*)themes[i].bg;
+		colors[2] = (char*)themes[i].inactive;
+		scheme[SchemeNorm] = drw_scm_create(drw, (const char**)colors, 3);
+		colors[0] = (char*)themes[i].bg;
+		colors[1] = (char*)themes[i].active;
+		colors[2] = (char*)themes[i].active2;
+		scheme[SchemeSel] = drw_scm_create(drw, (const char**)colors, 3);
 	}
 	/* init system tray */
 	updatesystray();
@@ -1954,6 +1905,7 @@ setup(void)
 	XSelectInput(dpy, root, wa.event_mask);
 	grabkeys();
 	focus(NULL);
+	setbg();
 }
 
 void
@@ -1992,8 +1944,6 @@ spawn(const Arg *arg)
 {
 	struct sigaction sa;
 
-	if (arg->v == dmenucmd)
-		dmenumon[0] = '0' + selmon->num;
 	if (fork() == 0) {
 		if (dpy)
 			close(ConnectionNumber(dpy));
@@ -2006,6 +1956,37 @@ spawn(const Arg *arg)
 
 		execvp(((char **)arg->v)[0], (char **)arg->v);
 		die("dwm: execvp '%s' failed:", ((char **)arg->v)[0]);
+	}
+}
+
+void
+dmenu(const Arg *arg)
+{
+	char *dmenucmd[] = {
+		"dmenu_run",
+		"-m", dmenumon,
+		"-fn", (char*)dmenufont,
+		"-nb", (char*)theme->bg,
+		"-nf", (char*)theme->fg,
+		"-sb", (char*)theme->inactive,
+		"-sf", (char*)theme->bg,
+		NULL
+	};
+	dmenumon[0] = '0' + selmon->num;
+	struct sigaction sa;
+
+	if (fork() == 0) {
+		if (dpy)
+			close(ConnectionNumber(dpy));
+		setsid();
+
+		sigemptyset(&sa.sa_mask);
+		sa.sa_flags = 0;
+		sa.sa_handler = SIG_DFL;
+		sigaction(SIGCHLD, &sa, NULL);
+
+		execvp(dmenucmd[0], dmenucmd);
+		die("dwm: execvp '%s' failed:", dmenucmd[0]);
 	}
 }
 
@@ -2053,13 +2034,13 @@ tile(Monitor *m)
 			resize(c, m->wx, m->wy + my, mw - (2*c->bw), h - (2*c->bw), 0);
 			if (my + HEIGHT(c) < m->wh)
 				my += HEIGHT(c);
-     mfacts -= c->cfact;
+			mfacts -= c->cfact;
 		} else {
 			h = (m->wh - ty) * (c->cfact / sfacts);
 			resize(c, m->wx + mw, m->wy + ty, m->ww - mw - (2*c->bw), h - (2*c->bw), 0);
 			if (ty + HEIGHT(c) < m->wh)
 				ty += HEIGHT(c);
-     sfacts -= c->cfact;
+			sfacts -= c->cfact;
 		}
 }
 
@@ -2224,7 +2205,7 @@ updatebars(void)
 	XSetWindowAttributes wa = {
 		.override_redirect = True,
 		.background_pixmap = ParentRelative,
-		.event_mask = ButtonPressMask|ExposureMask
+		.event_mask = ButtonPressMask|ExposureMask|KeyReleaseMask
 	};
 	XClassHint ch = {"dwm", "dwm"};
 	for (m = mons; m; m = m->next) {
@@ -2580,13 +2561,13 @@ void
 view(const Arg *arg)
 {
 	int i;
-	unsigned int tmptag;
+	unsigned int tmptag, newtags;
 
-	if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
-		return;
+	newtags = arg->ui & TAGMASK;
+
 	selmon->seltags ^= 1; /* toggle sel tagset */
-	if (arg->ui & TAGMASK) {
-		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+	if (newtags) {
+		selmon->tagset[selmon->seltags] = newtags;
 		selmon->pertag->prevtag = selmon->pertag->curtag;
 
 		if (arg->ui == ~0)
