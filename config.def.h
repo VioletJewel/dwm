@@ -43,7 +43,7 @@ static const Rule rules[] = {
 	// { "Gimp",                NULL,       NULL,       0,            1,           -1 },
 	{ "mercury-default",        NULL,       NULL,       1 << 1,       0,           -1 },
 	{ "discord",                NULL,       NULL,       1 << 8,       0,           -1 },
-	{ "irc",                    NULL,       NULL,       1 << 8,       0,           -1 },
+	{ NULL,                     "irc",      NULL,       1 << 8,       0,           -1 },
 };
 
 /* layout(s) */
@@ -77,7 +77,7 @@ static const Layout layouts[] = {
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", theme.bg, "-nf", theme.fg, "-sb", theme.active, "-sf", theme.bg, NULL };
 static const char *termcmd[]  = { TERM, NULL };
-static const char *tabbedterm[] = { "tabbed", TERM, "-w", "", NULL };
+static const char *tabbedterm[] = { "tabbed", "-c", "-r", "2", TERM, "-w", "", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
@@ -134,7 +134,7 @@ static const Key keys[] = {
 	{ MODKEY|ControlMask,           XK_s,      spawn,          SHCMD("ekraneto fenestro") },
 
 	{ MODKEY,                       XK_w,      spawn,          {.v = (const char*[]){ "firefox", NULL } } },
-	{ MODKEY|ShiftMask,             XK_i,      spawn,          {.v = (const char*[]){ TERM, "-c", "irc", "-e", "weechat", NULL } } },
+	{ MODKEY|ShiftMask,             XK_i,      spawn,          {.v = (const char*[]){ "tabbed", "-c", "-n", "irc", "-r", "2", TERM, "-w", "", "-e", "weechat", NULL } } },
 
 	{ MODKEY,                       XK_BackSpace, spawn,       SHCMD("xautolock -enable; xautolock -locknow;") },
 	{ MODKEY|ShiftMask,             XK_BackSpace, spawn,       SHCMD("[ -f /tmp/.lock.disabled ] && { rm -f /tmp/.lock.disabled; xautolock -enable; notify-send 'slock enabled'; } || { touch /tmp/.lock.disabled; xautolock -disable; notify-send 'slock disabled'; };") },
