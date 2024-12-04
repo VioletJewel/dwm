@@ -10,8 +10,8 @@ static const int systraypinningfailfirst = 1;   /* 1: if pinning fails, display 
 static const int showsystray        = 1;        /* 0 means no systray */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
-static const char *fonts[]          = { "FiraCode Nerd Font:pixelsize=16:antialias=true:autohint=true" };
-static const char dmenufont[]       = "FiraCode Nerd Font:pixelsize=16:antialias=true:autohint=true";
+static const char *fonts[]          = { "FiraCode Nerd Font:pixelsize=14:antialias=true:autohint=true" };
+static const char dmenufont[]       = "FiraCode Nerd Font:pixelsize=14:antialias=true:autohint=true";
 
 struct theme {
 	const char *fg;
@@ -70,17 +70,20 @@ static const Layout layouts[] = {
 
 /* helper for spawning shell commands in the pre dwm-5.0 fashion */
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
-static const char term[] = "st";
+
+#define TERM "st"
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", theme.bg, "-nf", theme.fg, "-sb", theme.active, "-sf", theme.bg, NULL };
-static const char *termcmd[]  = { term, NULL };
+static const char *termcmd[]  = { TERM, NULL };
+static const char *tabbedterm[] = { "tabbed", TERM, "-w", "", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
 	{ MODKEY,                       XK_p,      spawn,          {.v = dmenucmd } },
 	{ MODKEY,                       XK_Return, spawn,          {.v = termcmd } },
+	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = tabbedterm } },
 	{ MODKEY,                       XK_b,      togglebar,      {0} },
 	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } },
@@ -131,7 +134,10 @@ static const Key keys[] = {
 	{ MODKEY|ControlMask,           XK_s,      spawn,          SHCMD("ekraneto fenestro") },
 
 	{ MODKEY,                       XK_w,      spawn,          {.v = (const char*[]){ "firefox", NULL } } },
-	{ MODKEY|ShiftMask,             XK_i,      spawn,          {.v = (const char*[]){ term, "-c", "irc", "-e", "weechat", NULL } } },
+	{ MODKEY|ShiftMask,             XK_i,      spawn,          {.v = (const char*[]){ TERM, "-c", "irc", "-e", "weechat", NULL } } },
+
+	{ MODKEY,                       XK_BackSpace, spawn,       SHCMD("xautolock -enable; xautolock -locknow;") },
+	{ MODKEY|ShiftMask,             XK_BackSpace, spawn,       SHCMD("[ -f /tmp/.lock.disabled ] && { rm -f /tmp/.lock.disabled; xautolock -enable; notify-send 'slock enabled'; } || { touch /tmp/.lock.disabled; xautolock -disable; notify-send 'slock disabled'; };") },
 };
 
 /* button definitions */

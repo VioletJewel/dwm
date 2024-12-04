@@ -250,6 +250,7 @@ static void unmanage(Client *c, int destroyed);
 static void unmapnotify(XEvent *e);
 static void updatebarpos(Monitor *m);
 static void updatebars(void);
+static void updatebg(void);
 static void updateclientlist(void);
 static int updategeom(void);
 static void updatenumlockmask(void);
@@ -1900,6 +1901,7 @@ setup(void)
 	/* init bars */
 	updatebars();
 	updatestatus();
+	updatebg();
 	/* supporting window for NetWMCheck */
 	wmcheckwin = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
 	XChangeProperty(dpy, wmcheckwin, netatom[NetWMCheck], XA_WINDOW, 32,
@@ -2206,6 +2208,14 @@ updatebars(void)
 		XMapRaised(dpy, m->barwin);
 		XSetClassHint(dpy, m->barwin, &ch);
 	}
+}
+
+void
+updatebg(void)
+{
+	XSetWindowBackground(dpy, root, scheme[SchemeNorm][ColBg].pixel);
+	XClearWindow(dpy, root);
+	// XFlush(dpy);
 }
 
 void
