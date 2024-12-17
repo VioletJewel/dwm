@@ -130,11 +130,11 @@ static const Key keys[] = {
 	{ MODKEY|Mod1Mask,              XK_l,      spawn,          SHCMD("notify-send -h 'string:synchronous:volume' \"$(pactl get-sink-volume '@DEFAULT_SINK@' | head -n1 | awk '{ printf \"%s | %s\", $5, $12 }';[ \"$(pactl get-sink-mute '@DEFAULT_SINK@' | cut -d' ' -f2)\" = 'yes' ] && echo -n ' (muted)')\"") },
 
 	{ MODKEY,                       XK_s,      spawn,          SHCMD("ekraneto plena") },
-	{ MODKEY|ShiftMask,             XK_s,      spawn,          SHCMD("ekraneto selektu") },
+	{ MODKEY|ShiftMask,             XK_s,      spawn,          SHCMD("ekraneto elektu") },
 	{ MODKEY|ControlMask,           XK_s,      spawn,          SHCMD("ekraneto fenestro") },
 
 	{ MODKEY,                       XK_w,      spawn,          {.v = (const char*[]){ "firefox", NULL } } },
-	{ MODKEY|ShiftMask,             XK_i,      spawn,          {.v = (const char*[]){ "tabbed", "-c", "-n", "irc", "-r", "2", TERM, "-w", "", "-e", "weechat", NULL } } },
+	{ MODKEY|ShiftMask,             XK_i,      spawn,          SHCMD("st -w \"$(tabbed -c -s -n irc -d -r 2 st -w '')\" -e weechat") },
 
 	{ MODKEY,                       XK_BackSpace, spawn,       SHCMD("xautolock -enable; xautolock -locknow;") },
 	{ MODKEY|ShiftMask,             XK_BackSpace, spawn,       SHCMD("[ -f /tmp/.lock.disabled ] && { rm -f /tmp/.lock.disabled; xautolock -enable; notify-send 'slock enabled'; } || { touch /tmp/.lock.disabled; xautolock -disable; notify-send 'slock disabled'; };") },
